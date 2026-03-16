@@ -1,0 +1,55 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Resolve project root
+        id: paths
+        run: |
+          if [ -f "frontend/package.json" ] && [ -f "backend/package.json" ]; then
+            echo "root=." >> "$GITHUB_OUTPUT"
+          else
+            found=""
+            for d in */; do
+              if [ -f "${d}frontend/package.json" ] && [ -f "${d}backend/package.json" ]; then
+                found="${d%/}"
+                break
+              fi
+            done
+
+            if [ -n "$found" ]; then
+              echo "root=$found" >> "$GITHUB_OUTPUT"
+            else
+              echo "Could not find backend/frontend package.json files."
+              echo "Current tree:"
+              ls -la
+              exit 1
+            fi
+          fi
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Install backend dependencies
+        working-directory: ${{ steps.paths.outputs.root }}/backend
+        run: npm ci
+
+      - name: Install frontend dependencies
+        working-directory: ${{ steps.paths.outputs.root }}/frontend
+        run: npm ci
+
+      - name: Build frontend
+        working-directory: ${{ steps.paths.outputs.root }}/frontend
+        run: npm run build
